@@ -1,14 +1,12 @@
 from random import random, randint, normalvariate
 
-BASESTARTROW = 2
-STARTROWVARIATION = 1
+NORMALIZEFACTORW = 0.2
+NORMALIZEFACTORH = 0.2
+NEUTRALPULLFACTOR = 0.1
+MINSPACE = 0.6
 
-NORMALIZEFACTORW = 0.3
-NORMALIZEFACTORH = 0.3
-NEUTRALPULLFACTOR = 0.4
-
-MOVESIGW = 0.5
-MOVESIGH = 0.5
+MOVESIGW = 0.8
+MOVESIGH = 0.8
 
 DOUBLEPUSH = 0.1
 
@@ -17,7 +15,7 @@ def readMapFile(filename):
     fileobj = open(filename)
     layoutname = False
     for line in fileobj.readlines():
-        line = line.strip()
+        line = line.rstrip()
         if line[0] == '~':
             if layoutname:
                 layouts[layoutname] = layout
@@ -59,6 +57,7 @@ alternate key values"""
     if 0 < amr < DOUBLEPUSH:
         try: press += layouts[layout][(nc,nr+mr/amr)][mod]
         except: pass
+    #print (pos, press)
     return press
         
     
@@ -78,6 +77,8 @@ spaces them horizontally"""
             spaceSum += hand[f+1][0] - hand[f][0]
     middle = sumW/fingers
     space = spaceSum/fingers
+    if space < MINSPACE:
+        space = MINSPACE
     left = middle - 2*space
     avgH = sumH/fingers
         
@@ -105,7 +106,7 @@ def standardMash(layout, length):
     """Mashes a length of characters as if it was done by someone typing very
 neatly with random finger movement"""
     
-    startingrow = normalvariate(BASESTARTROW, STARTROWVARIATION)
+    startingrow = 1.8
     startingcolL = 1 #+ random()
     startingcolR = 7 #6 + 2*random()
 
@@ -114,14 +115,14 @@ neatly with random finger movement"""
     cooldown = [1 for c in range(8)]
     hotness = 8
 
-    string = ""
-    for c in range(length):
+    mash = ""
+    while len(mash) < length:
         choice = randint(1,hotness)
         for f in range(len(cooldown)):
             if choice <= cooldown[f]:
                 fingers[f//4][f%4] = pressMove(fingers[f//4][f%4])
-                string += posToKey(layout, fingers[f//4][f%4], False)
-                
+                hit = f
+
                 choice = hotness + 1 #extra hot
                 choice += 1 #TOO HOT
                 choice -= 1 #whew
@@ -134,31 +135,29 @@ neatly with random finger movement"""
         normalizeHand(fingers[1])
         pullToNeutral(fingers[0], startingcolL, startingrow)
         pullToNeutral(fingers[1], startingcolR, startingrow)
+        for m in posToKey(layout, fingers[hit//4][hit%4], False):
+            if m not in banned:
+                mash += m
+    return mash[:length]
 
-    return string
+
+def getValidInput(condition, prompt, error):
+    inp = input(prompt)
+    while eval(condition):
+        print(error)
+        inp = input(prompt)
+    return inp
+
         
 layouts = readMapFile("keymaps.cfg")
 
 print("Mash Generator")
 print("Supported layouts: %s" % (", ".join(layouts.keys())))
-print("Type 'quit' to exit\n")
+banned = input("Please type all the characters you do not want in the mash: ")
 
-while 1:
-    layout = input("mash layout: ")
-    if layout == "quit":
-        break
-    while layout not in layouts:
-        print("Unsupported layout.")
-        layout = input("mash layout: ")
-        if layout == "quit":
-            break
 
-    length = input("mash length: ")
-    if length == "quit":
-        break
-    while not length.isdigit():
-        print("Invalid length.")
-        length = input("mash length: ")
-        if length == "quit":
-            break
-    print("%s\n" % (standardMash(layout, int(length))))
+layout = getValidInput("inp not in layouts","Mash layout: ",
+                       "Unsupported layout.")
+length = getValidInput("not inp.isdigit()", "Mash length: ", "Invalid length.")
+
+print("%s" % (standardMash(layout, int(length))))
